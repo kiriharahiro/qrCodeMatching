@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Chromebook/PCブラウザ対応のQRコードマッチング・照合アプリ。Googleスプレッドシートへの自動ログ書き込み。">
+  <title>QR Matching App - QRコード照合 & ログシステム</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- HTML5 QR Code library via CDN -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+  <!-- Offline status indicator banner -->
+  <div id="offline-banner" class="offline-banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.5M5 12.5a10.94 10.94 0 0 1 5.17-2.39M9.08 5.17A16.22 16.22 0 0 1 12 5c2.46 0 4.8.54 6.92 1.51M21.24 8.76A17.9 17.9 0 0 1 23 10.5M1.76 8.76A17.9 17.9 0 0 1 3 10.5M10.22 16.22a3 3 0 0 1 3.56 0M12 20h.01"></path>
+    </svg>
+    オフラインモード - 送信エラーになったデータは、オンライン復帰後に自動でスプレッドシートに送信されます。
+  </div>
+
+  <header>
+    <div class="logo-section">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 4h6v6H4V4zm2 2v2h2V6H6zm0 7h2v2H6v-2zm7-9h6v6h-6V4zm2 2v2h2V6h-2zm-9 7h6v6H4v-6zm2 2v2h2v-2H6zm11-2h2v2h-2v-2zm-3 3h2v2h-2v-2zm3 2h2v2h-2v-2zm-3-5h2v2h-2v-2zm5-2h2v2h-2v-2zm-5 7h2v2h-2v-2zm5 2h2v2h-2v-2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>QR Matching & Sync</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="toggle-camera-btn" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span>カメラ起動</span>
+      </button>
+      <button id="reset-workflow-btn" class="btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+        </svg>
+        リセット
+      </button>
+      <button id="open-settings-btn" class="btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        設定
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left column: Scanner, overlay, and workflow info -->
+    <section class="card scanner-card">
+      <div class="scanner-title-bar">
+        <h2>カメラビュー & 判定</h2>
+        <div class="scanner-status-indicator">
+          <div id="status-dot" class="status-dot"></div>
+          <span id="status-text">カメラ未起動</span>
+        </div>
+      </div>
+
+      <div id="camera-container" class="camera-container">
+        <!-- Render target for html5-qrcode -->
+        <div id="reader"></div>
+
+        <!-- Custom visual elements on top of reader -->
+        <div class="scanner-overlay">
+          <div class="scan-box">
+            <span></span>
+            <div class="scan-laser"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Match status visual indicators -->
+      <div class="matching-workflow-panel">
+        <div id="step-A" class="workflow-step active">
+          <span class="step-label">1. 照合元 (QRコードA)</span>
+          <div id="val-A" class="step-value placeholder">スキャンしてください...</div>
+        </div>
+        <div id="step-B" class="workflow-step">
+          <span class="step-label">2. 照合先 (QRコードB)</span>
+          <div id="val-B" class="step-value placeholder">スキャンしてください...</div>
+        </div>
+
+        <div id="match-status-banner" class="match-status-banner">
+          照合結果をここに表示
+        </div>
+      </div>
+    </section>
+
+    <!-- Right column: Logs / Matching history -->
+    <section class="card history-card">
+      <div class="history-header">
+        <h2 class="history-title">照合履歴ログ</h2>
+        <span id="history-count" class="history-count">0 件</span>
+        <button id="clear-history-btn" class="btn btn-icon" style="margin-left: auto;" title="履歴をクリア">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div id="history-list" class="history-list">
+        <!-- History items will be injected here dynamically -->
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
+          <p>スキャンした履歴がここに表示されます</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Result Popup Modal (Match Success / Failure) -->
+  <div id="result-modal" class="modal-overlay">
+    <div class="modal-content result-modal-content">
+      <!-- Success State View -->
+      <div id="result-success-view" class="result-view" style="display: none;">
+        <h3 class="result-title-main success">🎉 照合一致！お渡しできます</h3>
+        
+        <div class="result-user-info">
+          <div class="info-label">製作者のお名前</div>
+          <div id="result-user-name" class="info-value-large">-</div>
+        </div>
+
+        <div class="result-image-container">
+          <div id="image-loading-spinner" class="spinner"></div>
+          <img id="result-thumbnail" src="" alt="完成品画像" style="display: none;">
+        </div>
+      </div>
+      
+      <!-- Failure State View -->
+      <div id="result-failure-view" class="result-view" style="display: none;">
+        <h3 class="result-title-main failure">❌ 照合エラー</h3>
+        <div class="failure-message-box">
+          <p class="failure-message-large">残念！ 不一致です。</p>
+          <p class="failure-message-sub">他の作品を探してください</p>
+        </div>
+      </div>
+      
+      <button id="close-result-btn" class="btn btn-primary" style="justify-content: center; width: 100%; font-size: 1rem; padding: 0.75rem;">
+        閉じる (Esc)
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">システム環境設定</h3>
+        <button id="close-settings-btn" class="close-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label for="gas-url-input">Google Apps Script (GAS) Web App URL</label>
+        <input type="url" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec">
+        <p class="help-text">
+          スプレッドシート書き込み用のGAS WebアプリURLを入力してください。空欄の場合、結果はブラウザの履歴ログのみに保存されます。
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="device-name-input">端末名 / 担当者名</label>
+        <input type="text" id="device-name-input" placeholder="例: Chromebook-01, 担当A">
+        <p class="help-text">
+          スプレッドシートにログを記録する際、どの端末・人物が記録したかを区別できます。
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="reset-delay-select">マッチ判定後の自動リセット時間</label>
+        <select id="reset-delay-select">
+          <option value="1000">1秒</option>
+          <option value="2000" selected>2秒</option>
+          <option value="3000">3秒</option>
+          <option value="5000">5秒</option>
+          <option value="0">手動リセットのみ</option>
+        </select>
+        <p class="help-text">
+          マッチング判定後、次の照合を開始するまでのカメラ再開待機時間。
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="audio-feedback-select">音声フィードバック</label>
+        <select id="audio-feedback-select">
+          <option value="on">有効 (警告音・ビープ音)</option>
+          <option value="off">無効</option>
+        </select>
+      </div>
+
+      <button id="save-settings-btn" class="btn btn-primary" style="margin-top: 1rem; justify-content: center;">
+        設定を保存する
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
