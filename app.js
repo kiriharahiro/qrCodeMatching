@@ -357,11 +357,19 @@ function onScanFailure(error) {
 // --- Matching & Check-digit Handling Logic ---
 
 /**
- * Strips the check digit (hyphen and anything after it) and normalizes case
+ * Strips the check digit (hyphen and anything after it) and normalizes case.
+ * If the input is a Google Forms pre-filled URL, extracts the final 8 characters first.
  */
 function cleanQrCode(code) {
   if (!code) return '';
-  return code.split('-')[0].trim().toUpperCase();
+  let cleaned = code.trim();
+  
+  // Extract final 8 characters if it's a URL or long string
+  if (cleaned.startsWith('http') || cleaned.length > 20) {
+    cleaned = cleaned.slice(-8);
+  }
+  
+  return cleaned.split('-')[0].trim().toUpperCase();
 }
 
 /**
