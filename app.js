@@ -596,7 +596,7 @@ function resetWorkflow() {
   }
 }
 
-// --- Sync engine / GAS Communication (Updated to handle CORS responses) ---
+// --- Sync engine / GAS Communication (Updated to handle CORS-free JSONP) ---
 function syncLogItem(item, callback) {
   if (!state.settings.gasUrl) {
     console.log('GAS URL is not configured. Log saved locally.');
@@ -604,50 +604,69 @@ function syncLogItem(item, callback) {
     return;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  // We send as plain text to prevent preflight CORS pre-checks.
-  // The GAS Apps Script backend parses JSON raw payload directly.
-  fetch(state.settings.gasUrl, {
-    method: 'POST',
-    mode: 'cors',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8'
-    },
-    body: JSON.stringify(item),
-    signal: controller.signal
-  })
-  .then(response => {
-    clearTimeout(timeoutId);
-    if (!response.ok) {
-      throw new Error('GAS server response issue: ' + response.status);
-    }
-    return response.json();
-  })
-  .then(res => {
-    if (res.status === 'success') {
+  // If we don't need a response (offline background resync), we can use POST no-cors
+  if (!callback) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    fetch(state.settings.gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(item),
+      signal: controller.signal
+    })
+    .then(() => {
+      clearTimeout(timeoutId);
       markAsSynced(item.id);
-      
-      // Update history list with true name (Title) if returned
-      updateHistoryName(item.id, res.name);
+    })
+    .catch(err => {
+      clearTimeout(timeoutId);
+      console.error('Offline sync failed', err);
+    });
+    return;
+  }
 
-      if (callback) {
-        callback(true, {
-          name: res.name || '取得不能',
-          imageUrl: res.imageUrl || ''
-        });
-      }
-    } else {
-      console.warn('GAS process warning:', res.message);
-      if (callback) callback(false, null);
+  // Real-time matching requires reading name/image. We use JSONP (GET) to bypass CORS blocks.
+  const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+  
+  const timeoutId = setTimeout(() => {
+    // Clean up on timeout
+    if (window[callbackName]) {
+      delete window[callbackName];
+      const scriptEl = document.getElementById(callbackName);
+      if (scriptEl) scriptEl.remove();
+      console.warn('GAS connection timed out (JSONP)');
+      callback(false, null);
     }
-  })
-  .catch(err => {
+  }, 10000);
+
+  // Global callback mapping
+  window[callbackName] = function(res) {
     clearTimeout(timeoutId);
-    console.error('GAS connection failed. Buffered offline.', err);
-    if (callback) callback(false, null);
-  });
+    delete window[callbackName];
+    const scriptEl = document.getElementById(callbackName);
+    if (scriptEl) scriptEl.remove();
+
+    if (res && res.status === 'success') {
+      markAsSynced(item.id);
+      updateHistoryName(item.id, res.name);
+      callback(true, {
+        name: res.name || '取得不能',
+        imageUrl: res.imageUrl || ''
+      });
+    } else {
+      console.warn('GAS processed with JSONP warning:', res ? res.message : 'no response');
+      callback(false, null);
+    }
+  };
+
+  // Dynamic script tag injection
+  const script = document.createElement('script');
+  script.id = callbackName;
+  const encodedItem = encodeURIComponent(JSON.stringify(item));
+  script.src = state.settings.gasUrl + '?callback=' + callbackName + '&data=' + encodedItem;
+  
+  // Script append triggers execution
+  document.body.appendChild(script);
 }
 
 function markAsSynced(id) {
