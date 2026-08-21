@@ -83,8 +83,8 @@ function doPost(e) {
         // 1. N列 (14列目) 「お渡し完了時刻」を現在時刻でテキスト更新
         masterSheet.getRange(foundRow, 14).setValue(formattedJst);
         
-        // 2. D列 (4列目) 「スマホにダウンロードしたお名前」を取得
-        userName = masterSheet.getRange(foundRow, 4).getValue().toString().trim() || '名前未登録';
+        // 2. E列 (5列目) 「スマホにダウンロードしたお名前」などの氏名列を取得
+        userName = masterSheet.getRange(foundRow, 5).getValue().toString().trim() || '名前未登録';
         
         // 3. T列 (20列目) 「jpg」 (サムネイル画像共有URL) を取得
         imageUrl = masterSheet.getRange(foundRow, 20).getValue().toString().trim();
