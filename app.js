@@ -279,11 +279,17 @@ function startCamera() {
       state.scanner.start(
         cameraId,
         {
-          fps: 10,
+          fps: 15, // Increase scan frame rate for responsiveness
           qrbox: (width, height) => {
-            // Responsive scanner box mapping the layout CSS overlay
-            const size = Math.min(width, height) * 0.65;
+            // Expand the scan target box slightly (0.65 -> 0.75) to allow further capture
+            const size = Math.min(width, height) * 0.75;
             return { width: size, height: size };
+          },
+          // Ask browser for high resolution constraints to clarify tiny dots
+          videoConstraints: {
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+            facingMode: "environment"
           }
         },
         onScanSuccess,
