@@ -630,21 +630,30 @@ function syncLogItem(item, callback) {
   
   const timeoutId = setTimeout(() => {
     // Clean up on timeout
-    if (window[callbackName]) {
-      delete window[callbackName];
+    if (window[callbackName] && typeof window[callbackName] === 'function' && window[callbackName] !== Object.prototype.toString) {
+      // Replace with dummy function instead of deleting to prevent late script exec crashes
+      window[callbackName] = function() {};
       const scriptEl = document.getElementById(callbackName);
       if (scriptEl) scriptEl.remove();
       console.warn('GAS connection timed out (JSONP)');
       callback(false, null);
     }
-  }, 10000);
+  }, 20000); // Extended timeout to 20 seconds
 
   // Global callback mapping
   window[callbackName] = function(res) {
     clearTimeout(timeoutId);
+    // Check if it's already timed out (became a dummy function)
+    const isTimedOut = (window[callbackName] && window[callbackName].toString() === 'function() {}');
+    
     delete window[callbackName];
     const scriptEl = document.getElementById(callbackName);
     if (scriptEl) scriptEl.remove();
+
+    if (isTimedOut) {
+      console.warn('Late GAS response received but already timed out.');
+      return;
+    }
 
     if (res && res.status === 'success') {
       markAsSynced(item.id);
