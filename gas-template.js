@@ -86,8 +86,8 @@ function doPost(e) {
         // 2. E列 (5列目) 「スマホにダウンロードしたお名前」などの氏名列を取得
         userName = masterSheet.getRange(foundRow, 5).getValue().toString().trim() || '名前未登録';
         
-        // 3. T列 (20列目) 「jpg」 (サムネイル画像共有URL) を取得
-        imageUrl = masterSheet.getRange(foundRow, 20).getValue().toString().trim();
+        // 3. U列 (21列目) 「jpg画像URL」 を取得
+        imageUrl = masterSheet.getRange(foundRow, 21).getValue().toString().trim();
       } else {
         userName = 'マッチしましたが、マスターに該当QRが見つかりません';
       }
